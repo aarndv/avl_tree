@@ -1,0 +1,2130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AVL Tree Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f0f2f5;
+    --bg-header: #ffffff;
+    --bg-panel: #fafbfc;
+    --bg-card: #eef0f4;
+    --border: #dde1e7;
+    --text: #1a1d23;
+    --text-dim: #64748b;
+    --accent: #4f6ef7;
+    --accent-light: #e0e7ff;
+    --accent-hover: #3b5bdb;
+    --node-fill: #ffffff;
+    --node-stroke: #475569;
+    --color-insert: #10b981;
+    --color-insert-bg: #d1fae5;
+    --color-delete: #ef4444;
+    --color-delete-bg: #fee2e2;
+    --color-rotate: #f59e0b;
+    --color-rotate-bg: #fef3c7;
+    --color-successor: #8b5cf6;
+    --color-successor-bg: #ede9fe;
+    --color-traverse: #4f6ef7;
+    --color-traverse-bg: #e0e7ff;
+    --edge-color: #b0b8c4;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+    --shadow: 0 4px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+    --shadow-md: 0 8px 24px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+    --radius: 10px;
+  }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    font-size: 16px;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    height: 64px;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 8px rgba(0,0,0,0.04);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 2;
+  }
+  header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
+  .mode-toggle {
+    display: flex;
+    gap: 3px;
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 4px;
+    border: 1px solid var(--border);
+  }
+  .mode-toggle button {
+    padding: 7px 18px;
+    background: transparent;
+    color: var(--text-dim);
+    border: none;
+    border-radius: 9px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+  .mode-toggle button:hover:not(.active) { color: var(--text); background: rgba(255,255,255,0.5); }
+  .mode-toggle button.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(79,110,247,0.3);
+  }
+  .step-counter {
+    font-size: 14px;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    background: var(--bg-card);
+    padding: 4px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Main layout ── */
+  .main-area { display: flex; flex: 1; overflow: hidden; }
+  .viz-container {
+    flex: 1; position: relative; overflow: hidden;
+    background: radial-gradient(circle at 50% 50%, rgba(79,110,247,0.02) 0%, transparent 70%);
+  }
+  #tree-svg { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+  #tree-svg.panning { cursor: grabbing; }
+  .zoom-controls {
+    position: absolute;
+    bottom: 16px; right: 16px;
+    display: flex; flex-direction: column; gap: 4px; z-index: 5;
+  }
+  .zoom-controls button {
+    width: 40px; height: 40px;
+    background: var(--bg-header); border: 1px solid var(--border);
+    border-radius: var(--radius); cursor: pointer; font-size: 20px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text); box-shadow: var(--shadow); line-height: 1;
+    transition: all 0.15s ease;
+  }
+  .zoom-controls button:hover { background: var(--bg-card); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  .zoom-controls button:active { transform: translateY(0); box-shadow: var(--shadow-sm); }
+  .empty-msg {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--text-dim);
+    font-size: 16px;
+    font-weight: 500;
+    opacity: 0.6;
+    pointer-events: none;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Explanation overlay (top-left) ── */
+  #explanation {
+    position: absolute;
+    top: 20px; left: 20px;
+    max-width: 440px;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.6);
+    border-radius: 14px;
+    padding: 18px 22px;
+    box-shadow: var(--shadow-md);
+    pointer-events: none;
+    z-index: 5;
+    display: none;
+  }
+  #explanation.show { display: block; }
+  #expl-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  #expl-title .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .tag-insert { background: var(--color-insert-bg); color: var(--color-insert); }
+  .tag-delete { background: var(--color-delete-bg); color: var(--color-delete); }
+  .tag-rotate { background: var(--color-rotate-bg); color: var(--color-rotate); }
+  .tag-info   { background: var(--accent-light); color: var(--accent); }
+  #expl-body {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-dim);
+  }
+  #expl-body code {
+    font-family: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 13px;
+    background: var(--bg-card);
+    padding: 2px 7px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Log panel ── */
+  .log-panel {
+    width: 300px;
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+  .log-panel h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 700;
+  }
+  #log-entries { flex: 1; overflow-y: auto; padding: 6px 0; }
+  #log-entries::-webkit-scrollbar { width: 5px; }
+  #log-entries::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  #log-entries::-webkit-scrollbar-track { background: transparent; }
+  .log-entry {
+    padding: 8px 20px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    border-left: 3px solid transparent;
+    transition: all 0.2s ease;
+  }
+  .log-entry:hover { background: rgba(0,0,0,0.02); }
+  .log-entry.active {
+    background: var(--accent-light);
+    color: var(--text);
+    border-left-color: var(--accent);
+    font-weight: 500;
+  }
+  .log-entry .step-num {
+    font-weight: 700;
+    margin-right: 8px;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+    font-size: 12px;
+  }
+  .log-entry.type-insert .step-num { color: var(--color-insert); }
+  .log-entry.type-insert.active { background: var(--color-insert-bg); border-left-color: var(--color-insert); }
+  .log-entry.type-delete .step-num { color: var(--color-delete); }
+  .log-entry.type-delete.active { background: var(--color-delete-bg); border-left-color: var(--color-delete); }
+  .log-entry.type-rotate .step-num { color: var(--color-rotate); }
+  .log-entry.type-rotate.active { background: var(--color-rotate-bg); border-left-color: var(--color-rotate); }
+
+  /* ── Code panel ── */
+  .code-panel {
+    width: 300px;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .code-header h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    font-weight: 700;
+  }
+  .code-op-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: none;
+  }
+  .code-op-badge.op-insert { display: inline-block; background: var(--color-insert-bg); color: var(--color-insert); }
+  .code-op-badge.op-delete { display: inline-block; background: var(--color-delete-bg); color: var(--color-delete); }
+  .code-op-badge.op-rotate { display: inline-block; background: var(--color-rotate-bg); color: var(--color-rotate); }
+  .code-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 0;
+    font-family: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .code-content::-webkit-scrollbar { width: 5px; }
+  .code-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .code-content::-webkit-scrollbar-track { background: transparent; }
+  .code-line {
+    padding: 1px 14px 1px 0;
+    display: flex;
+    white-space: pre;
+    border-left: 3px solid transparent;
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+  .code-line:hover { background: rgba(0,0,0,0.02); }
+  .code-line.hl {
+    background: var(--accent-light);
+    border-left-color: var(--accent);
+  }
+  .code-line.hl-insert { background: var(--color-insert-bg); border-left-color: var(--color-insert); }
+  .code-line.hl-delete { background: var(--color-delete-bg); border-left-color: var(--color-delete); }
+  .code-line.hl-rotate { background: var(--color-rotate-bg); border-left-color: var(--color-rotate); }
+  .code-line .line-num {
+    width: 28px;
+    text-align: right;
+    color: var(--text-dim);
+    margin-right: 10px;
+    user-select: none;
+    opacity: 0.4;
+    flex-shrink: 0;
+  }
+  .code-line.hl .line-num,
+  .code-line.hl-insert .line-num,
+  .code-line.hl-delete .line-num,
+  .code-line.hl-rotate .line-num { opacity: 0.8; }
+  .code-line .line-text { color: var(--text); }
+  .code-line.blank { min-height: 12px; }
+  .code-placeholder {
+    padding: 24px 16px;
+    color: var(--text-dim);
+    font-size: 13px;
+    text-align: center;
+    opacity: 0.6;
+    font-family: 'Poppins', sans-serif;
+  }
+  .code-kw { color: #8b5cf6; font-weight: 600; }
+  .code-fn { color: #4f6ef7; }
+  .code-lit { color: #f59e0b; }
+  .code-cmt { color: var(--text-dim); opacity: 0.6; font-style: italic; }
+
+  /* ── Code panel resize handle ── */
+  .code-resize-handle {
+    width: 5px;
+    cursor: col-resize;
+    background: transparent;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 3;
+    transition: background 0.15s ease;
+  }
+  .code-resize-handle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 3px;
+    height: 32px;
+    border-radius: 2px;
+    background: var(--border);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .code-resize-handle:hover { background: rgba(79,110,247,0.08); }
+  .code-resize-handle:hover::after { opacity: 1; }
+  .code-resize-handle.dragging { background: rgba(79,110,247,0.12); }
+  .code-resize-handle.dragging::after { opacity: 1; background: var(--accent); }
+
+  /* ── Footer controls ── */
+  footer {
+    padding: 14px 32px;
+    background: var(--bg-header);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -1px 8px rgba(0,0,0,0.03);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-shrink: 0;
+    min-height: 64px;
+    position: relative;
+    z-index: 2;
+  }
+  footer button {
+    padding: 8px 20px;
+    background: #fff;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 500;
+    transition: all 0.18s ease;
+    box-shadow: var(--shadow-sm);
+  }
+  footer button:hover:not(:disabled) {
+    background: var(--bg-card);
+    border-color: #c5c9d2;
+    box-shadow: var(--shadow);
+    transform: translateY(-1px);
+  }
+  footer button:active:not(:disabled) { transform: translateY(0); box-shadow: var(--shadow-sm); }
+  footer button:disabled { opacity: 0.35; cursor: default; }
+  footer button.primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(79,110,247,0.3);
+  }
+  footer button.primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--accent-hover), #2b48c8);
+    box-shadow: 0 4px 14px rgba(79,110,247,0.4);
+    transform: translateY(-1px);
+  }
+  footer button.danger {
+    color: var(--color-delete);
+    border-color: #fca5a5;
+  }
+  footer button.danger:hover:not(:disabled) {
+    background: var(--color-delete-bg);
+    border-color: var(--color-delete);
+    box-shadow: 0 2px 8px rgba(239,68,68,0.15);
+  }
+  footer input[type="number"] {
+    width: 100px;
+    padding: 8px 12px;
+    background: #fff;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 15px;
+    outline: none;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.18s ease;
+  }
+  footer input[type="number"]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(79,110,247,0.15);
+  }
+  footer .speed-group {
+    display: flex; align-items: center; gap: 8px; margin-left: 16px;
+  }
+  footer .speed-group label { font-size: 14px; color: var(--text-dim); }
+  footer input[type="range"] { width: 90px; accent-color: var(--accent); }
+
+  /* ── Toast ── */
+  .status-toast {
+    position: absolute;
+    bottom: 60px; left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    background: rgba(26,29,35,0.92);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #fff;
+    padding: 10px 24px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: none;
+    z-index: 10;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  }
+  .status-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── SVG ── */
+  .node-circle {
+    fill: var(--node-fill);
+    stroke: var(--node-stroke);
+    stroke-width: 2;
+    filter: url(#node-shadow);
+    transition: fill 0.2s ease, stroke 0.2s ease;
+  }
+  .node-circle.hl-insert  { fill: var(--color-insert-bg); stroke: var(--color-insert); stroke-width: 2.5; filter: url(#glow); }
+  .node-circle.hl-delete  { fill: var(--color-delete-bg); stroke: var(--color-delete); stroke-width: 2.5; filter: url(#glow); }
+  .node-circle.hl-rotate  { fill: var(--color-rotate-bg); stroke: var(--color-rotate); stroke-width: 2.5; filter: url(#glow); }
+  .node-circle.hl-successor { fill: var(--color-successor-bg); stroke: var(--color-successor); stroke-width: 2.5; filter: url(#glow); }
+  .node-circle.hl-traverse { fill: var(--color-traverse-bg); stroke: var(--color-traverse); stroke-width: 2.5; filter: url(#glow); }
+  .key-text {
+    fill: var(--text);
+    font-size: 17px;
+    font-weight: 700;
+    text-anchor: middle;
+    dominant-baseline: central;
+    pointer-events: none;
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  .bf-text {
+    fill: var(--text-dim);
+    font-size: 11px;
+    text-anchor: middle;
+    pointer-events: none;
+    font-family: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    opacity: 0.8;
+  }
+  .ht-text {
+    fill: var(--accent);
+    font-size: 10px;
+    text-anchor: middle;
+    pointer-events: none;
+    font-family: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    font-weight: 600;
+    opacity: 0.85;
+  }
+  .edge-line {
+    stroke: var(--edge-color);
+    stroke-width: 2;
+    stroke-linecap: round;
+    opacity: 0.7;
+  }
+  .preview-label {
+    fill: var(--color-insert);
+    font-size: 12px;
+    font-weight: 600;
+    text-anchor: middle;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    pointer-events: none;
+    font-family: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  }
+
+  /* ── Log toggle button (mobile) ── */
+  .log-toggle {
+    display: none;
+    position: absolute;
+    top: 10px; right: 10px;
+    width: 40px; height: 40px;
+    background: var(--bg-header);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 18px;
+    align-items: center; justify-content: center;
+    color: var(--text);
+    box-shadow: var(--shadow);
+    z-index: 6;
+    line-height: 1;
+    transition: all 0.15s ease;
+  }
+  .log-toggle:hover { background: var(--bg-card); box-shadow: var(--shadow-md); }
+
+  /* ── Code toggle button (mobile) ── */
+  .code-toggle {
+    display: none;
+    position: absolute;
+    top: 10px; right: 56px;
+    width: 40px; height: 40px;
+    background: var(--bg-header);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 16px;
+    align-items: center; justify-content: center;
+    color: var(--text);
+    box-shadow: var(--shadow);
+    z-index: 6;
+    line-height: 1;
+    transition: all 0.15s ease;
+  }
+  .code-toggle:hover { background: var(--bg-card); box-shadow: var(--shadow-md); }
+
+  /* ── Responsive: Tablet (≤900px) ── */
+  @media (max-width: 900px) {
+    header { padding: 0 16px; height: 56px; }
+    header h1 { font-size: 17px; }
+    .mode-toggle button { padding: 6px 14px; font-size: 14px; }
+    .step-counter { font-size: 13px; }
+    .code-panel { width: 220px; }
+    .code-content { font-size: 11px; }
+    .code-header { padding: 10px 12px 8px; }
+    .log-panel { width: 240px; }
+    .log-panel h2 { font-size: 12px; padding: 12px 14px 10px; }
+    .log-entry { font-size: 13px; padding: 6px 14px; }
+    #explanation { max-width: 320px; padding: 14px 16px; }
+    #expl-title { font-size: 14px; }
+    #expl-body { font-size: 13px; }
+    footer { padding: 10px 16px; gap: 8px; min-height: 56px; }
+    footer button { padding: 7px 14px; font-size: 14px; }
+    footer input[type="number"] { width: 80px; padding: 7px 10px; font-size: 14px; }
+  }
+
+  /* ── Responsive: Mobile (≤640px) ── */
+  @media (max-width: 640px) {
+    html, body { overflow: auto; height: auto; min-height: 100vh; min-height: 100dvh; }
+    body { min-height: 100vh; min-height: 100dvh; }
+    header { padding: 0 12px; height: 48px; gap: 6px; }
+    header h1 { font-size: 14px; white-space: nowrap; }
+    .mode-toggle { padding: 3px; }
+    .mode-toggle button { padding: 5px 10px; font-size: 12px; }
+    .step-counter { font-size: 11px; }
+
+    .main-area { flex-direction: column; flex: 1; min-height: 0; }
+    .viz-container { flex: 1; min-height: 300px; }
+
+    .code-panel {
+      display: block;
+      width: 100%;
+      max-height: 0;
+      overflow: hidden;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+      transition: max-height 0.3s ease;
+      order: -1;
+    }
+    .code-panel.open { max-height: 40vh; }
+    .code-content { overflow-x: auto; font-size: 11px; }
+    .code-resize-handle { display: none; }
+    .code-toggle { display: flex; }
+    .log-toggle { display: flex; }
+    .log-panel {
+      width: 100%;
+      max-height: 0;
+      overflow: hidden;
+      border-left: none;
+      border-top: 1px solid var(--border);
+      transition: max-height 0.3s ease;
+    }
+    .log-panel.open { max-height: 40vh; }
+    .log-panel h2 { font-size: 11px; padding: 10px 12px 8px; }
+    .log-entry { font-size: 12px; padding: 5px 12px; }
+    #log-entries { max-height: 35vh; }
+
+    #explanation { top: 10px; left: 10px; right: 106px; max-width: none; padding: 10px 14px; }
+    #expl-title { font-size: 13px; gap: 6px; margin-bottom: 4px; }
+    #expl-title .tag { font-size: 10px; padding: 2px 6px; }
+    #expl-body { font-size: 12px; line-height: 1.5; }
+    #expl-body code { font-size: 11px; padding: 1px 4px; }
+
+    .zoom-controls { bottom: 10px; right: 10px; }
+    .zoom-controls button { width: 36px; height: 36px; font-size: 18px; }
+
+    footer { padding: 10px 12px; gap: 6px; min-height: 48px; flex-wrap: wrap; }
+    footer button { padding: 6px 12px; font-size: 13px; border-radius: 6px; }
+    footer input[type="number"] { width: 70px; padding: 6px 8px; font-size: 13px; border-radius: 6px; }
+    footer .speed-group { margin-left: 0; gap: 4px; }
+    footer .speed-group label { font-size: 12px; }
+    footer input[type="range"] { width: 60px; }
+
+    .status-toast { font-size: 13px; padding: 8px 16px; bottom: 56px; }
+    .empty-msg { font-size: 14px; }
+  }
+
+  /* ── Responsive: Very small (≤400px) ── */
+  @media (max-width: 400px) {
+    header h1 { font-size: 12px; }
+    .mode-toggle button { padding: 4px 8px; font-size: 11px; }
+    footer { gap: 4px; padding: 8px 8px; }
+    footer button { padding: 5px 8px; font-size: 12px; }
+    footer input[type="number"] { width: 60px; padding: 5px 6px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>AVL Tree Visualizer</h1>
+  <div class="mode-toggle">
+    <button id="btn-demo" class="active">Demo</button>
+    <button id="btn-interactive">Interactive</button>
+  </div>
+  <span class="step-counter" id="step-counter"></span>
+</header>
+<div class="main-area">
+  <div class="code-panel" id="code-panel">
+    <div class="code-header">
+      <h2>Algorithm</h2>
+      <span class="code-op-badge" id="code-op-badge"></span>
+    </div>
+    <div class="code-content" id="code-content">
+      <div class="code-placeholder">Step through an operation to see the algorithm</div>
+    </div>
+  </div>
+  <div class="code-resize-handle" id="code-resize-handle"></div>
+  <div class="viz-container">
+    <svg id="tree-svg">
+      <defs>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="node-shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.1)"/>
+        </filter>
+      </defs>
+      <g id="canvas-group">
+        <g id="edges-group"></g>
+        <g id="nodes-group"></g>
+      </g>
+      <g id="preview-group"></g>
+    </svg>
+    <div class="zoom-controls">
+      <button id="zoom-in" title="Zoom in">+</button>
+      <button id="zoom-out" title="Zoom out">&minus;</button>
+      <button id="zoom-reset" title="Reset view" style="font-size:12px">&#8634;</button>
+    </div>
+    <div class="empty-msg" id="empty-msg">Empty tree</div>
+    <div id="explanation">
+      <div id="expl-title"></div>
+      <div id="expl-body"></div>
+    </div>
+    <div class="status-toast" id="status-toast"></div>
+    <button class="code-toggle" id="code-toggle" title="Toggle code panel">&lt;/&gt;</button>
+    <button class="log-toggle" id="log-toggle" title="Toggle log panel">&#9776;</button>
+  </div>
+  <div class="log-panel">
+    <h2>Operation Log</h2>
+    <div id="log-entries"></div>
+  </div>
+</div>
+<footer id="controls-bar"></footer>
+
+<script>
+// ── AVL Node ──
+class AVLNode {
+  static _nextId = 0;
+  constructor(key) {
+    this.key = key;
+    this.left = null;
+    this.right = null;
+    this.height = 1;
+    this.id = AVLNode._nextId++;
+  }
+  deepClone() {
+    const c = new AVLNode(this.key);
+    c.id = this.id;
+    c.height = this.height;
+    c.left = this.left ? this.left.deepClone() : null;
+    c.right = this.right ? this.right.deepClone() : null;
+    return c;
+  }
+}
+
+// ── AVL Tree (port of avl.cpp with detailed snapshots) ──
+class AVLTree {
+  constructor(onSnapshot) {
+    this.root = null;
+    this._onSnapshot = onSnapshot || null;
+  }
+  _h(n) { return n ? n.height : 0; }
+  _bf(n) { return n ? this._h(n.left) - this._h(n.right) : 0; }
+  _updH(n) { n.height = 1 + Math.max(this._h(n.left), this._h(n.right)); }
+
+  _rightRotate(y) {
+    const x = y.left, T2 = x.right;
+    x.right = y; y.left = T2;
+    this._updH(y); this._updH(x);
+    return x;
+  }
+  _leftRotate(x) {
+    const y = x.right, T2 = y.left;
+    y.left = x; x.right = T2;
+    this._updH(x); this._updH(y);
+    return y;
+  }
+
+  _snap(desc, highlights, explain, preview) {
+    if (this._onSnapshot) {
+      this._onSnapshot(this.root ? this.root.deepClone() : null, desc, highlights || {}, explain || null, preview || null);
+    }
+  }
+
+  _findNode(node, key) {
+    if (!node) return null;
+    if (key === node.key) return node;
+    return key < node.key ? this._findNode(node.left, key) : this._findNode(node.right, key);
+  }
+
+  _minNode(n) { let c = n; while (c.left) c = c.left; return c; }
+
+  // Collect path from root to key (for traversal highlights)
+  _pathTo(node, key) {
+    const path = [];
+    let cur = node;
+    while (cur) {
+      path.push(cur.id);
+      if (key === cur.key) break;
+      cur = key < cur.key ? cur.left : cur.right;
+    }
+    return path;
+  }
+
+  insert(key) {
+    const existing = this._findNode(this.root, key);
+    if (existing) {
+      this._snap(`Key ${key} already exists`, { [existing.id]: 'rotate' },
+        { tag: 'info', title: 'Duplicate Key', body: `<code>${key}</code> is already in the tree. AVL trees do not allow duplicate keys.` });
+      return false;
+    }
+    // Show preview node outside the tree
+    const preview = { key };
+    this._snap(`New node: ${key}`, {},
+      { tag: 'insert', title: `Insert ${key}`,
+        body: `New node <code>${key}</code> to insert. Traverse the tree to find the correct position.` },
+      preview);
+    // Step-by-step traversal (keep preview visible)
+    if (this.root) {
+      let cur = this.root;
+      const visited = [];
+      while (cur) {
+        visited.push({ id: cur.id, key: cur.key });
+        const hl = {};
+        for (const v of visited) hl[v.id] = 'traverse';
+        const dir = key < cur.key ? 'left' : 'right';
+        this._snap(`Compare ${key} with ${cur.key}, go ${dir}`, hl,
+          { tag: 'insert', title: `Insert ${key}`,
+            body: `Visiting node <code>${cur.key}</code>. Since <code>${key} ${key < cur.key ? '&lt;' : '&gt;'} ${cur.key}</code>, move to the ${dir} child.` },
+          preview);
+        cur = dir === 'left' ? cur.left : cur.right;
+      }
+    }
+
+    this.root = this._insertR(this.root, key);
+    // If tree was empty, the leaf snap is still pending (no parent to fire it)
+    if (this._pendingLeafSnap) {
+      const { id, key: k } = this._pendingLeafSnap;
+      this._pendingLeafSnap = null;
+      this._snap(`Created leaf node ${k} (h=1, BF=0)`, { [id]: 'insert' },
+        { tag: 'insert', title: `Insert ${k}`,
+          body: `Created new leaf node <code>${k}</code> with height 1 and balance factor 0. This is the root — no ancestors to check.` });
+    }
+    // Fire pending rotation snap for root-level rotations
+    if (this._pendingRotationSnap) {
+      const prs = this._pendingRotationSnap;
+      this._pendingRotationSnap = null;
+      this._snap(prs.desc, prs.hl, prs.explain);
+    }
+    const inserted = this._findNode(this.root, key);
+    this._snap(`Insert ${key} complete`, inserted ? { [inserted.id]: 'insert' } : {},
+      { tag: 'insert', title: `Insert ${key} — Complete`,
+        body: `Node <code>${key}</code> has been inserted and all ancestor heights and balance factors have been updated. The tree is balanced.` });
+    return true;
+  }
+
+  _insertR(node, key) {
+    if (!node) {
+      const newNode = new AVLNode(key);
+      this._pendingLeafSnap = { id: newNode.id, key };
+      return newNode;
+    }
+    if (key < node.key) node.left = this._insertR(node.left, key);
+    else if (key > node.key) node.right = this._insertR(node.right, key);
+    else return node;
+
+    // Fire "created leaf" snap now that the leaf is linked into the tree
+    if (this._pendingLeafSnap) {
+      const { id, key: k } = this._pendingLeafSnap;
+      this._pendingLeafSnap = null;
+      this._snap(`Created leaf node ${k} (h=1, BF=0)`, { [id]: 'insert' },
+        { tag: 'insert', title: `Insert ${k}`,
+          body: `Created new leaf node <code>${k}</code> with height 1 and balance factor 0. Now backtrack up the tree, updating heights and checking balance factors at each ancestor.` });
+    }
+
+    // Fire pending rotation snap (child rotation is now linked into the tree)
+    if (this._pendingRotationSnap) {
+      const prs = this._pendingRotationSnap;
+      this._pendingRotationSnap = null;
+      this._snap(prs.desc, prs.hl, prs.explain);
+    }
+
+    this._updH(node);
+    const bf = this._bf(node);
+
+    // Backtracking snapshot: show height/BF update at this ancestor
+    if (bf >= -1 && bf <= 1) {
+      this._snap(`Backtrack to ${node.key}: h=${node.height}, BF=${bf} — balanced`, { [node.id]: 'traverse' },
+        { tag: 'insert', title: 'Backtracking — Update Heights',
+          body: `Backtracking to node <code>${node.key}</code>. Updated height to <code>${node.height}</code>. Balance factor is <code>${bf}</code>, which is within [-1, 1] — no rotation needed. Continue backtracking.` });
+    }
+
+    if (bf > 1 && key < node.left.key) {
+      this._snap(`Imbalance at ${node.key} (BF=${bf}), Right Rotation (LL case)`,
+        { [node.id]: 'rotate', [node.left.id]: 'rotate' },
+        { tag: 'rotate', title: 'LL Case — Right Rotation',
+          body: `Backtracking to node <code>${node.key}</code>. Height updated to <code>${node.height}</code>. BF=${bf} — <strong>imbalanced!</strong> The new key <code>${key}</code> was inserted in the left subtree of the left child. Fix: single right rotation around <code>${node.key}</code>. The left child <code>${node.left.key}</code> becomes the new subtree root.` });
+      const result = this._rightRotate(node);
+      this._pendingRotationSnap = {
+        desc: `Rotation done — ${result.key} is new subtree root (LL case)`,
+        hl: { [result.id]: 'rotate' },
+        explain: { tag: 'rotate', title: 'LL Rotation Complete',
+          body: `Right rotation complete. <code>${result.key}</code> is now the subtree root. The subtree is balanced.` }
+      };
+      return result;
+    }
+    if (bf > 1 && key > node.left.key) {
+      this._snap(`Imbalance at ${node.key} (BF=${bf}), Left-Right Rotation (LR case)`,
+        { [node.id]: 'rotate', [node.left.id]: 'rotate' },
+        { tag: 'rotate', title: 'LR Case — Left-Right Rotation',
+          body: `Backtracking to node <code>${node.key}</code>. Height updated to <code>${node.height}</code>. BF=${bf} — <strong>imbalanced!</strong> The new key <code>${key}</code> went into the right subtree of the left child. Fix: first left-rotate the left child <code>${node.left.key}</code>, then right-rotate <code>${node.key}</code>.` });
+      node.left = this._leftRotate(node.left);
+      const result = this._rightRotate(node);
+      this._pendingRotationSnap = {
+        desc: `Rotation done — ${result.key} is new subtree root (LR case)`,
+        hl: { [result.id]: 'rotate' },
+        explain: { tag: 'rotate', title: 'LR Rotation Complete',
+          body: `Left-right double rotation complete. <code>${result.key}</code> is now the subtree root. The subtree is balanced.` }
+      };
+      return result;
+    }
+    if (bf < -1 && key > node.right.key) {
+      this._snap(`Imbalance at ${node.key} (BF=${bf}), Left Rotation (RR case)`,
+        { [node.id]: 'rotate', [node.right.id]: 'rotate' },
+        { tag: 'rotate', title: 'RR Case — Left Rotation',
+          body: `Backtracking to node <code>${node.key}</code>. Height updated to <code>${node.height}</code>. BF=${bf} — <strong>imbalanced!</strong> The new key <code>${key}</code> was inserted in the right subtree of the right child. Fix: single left rotation around <code>${node.key}</code>. The right child <code>${node.right.key}</code> becomes the new subtree root.` });
+      const result = this._leftRotate(node);
+      this._pendingRotationSnap = {
+        desc: `Rotation done — ${result.key} is new subtree root (RR case)`,
+        hl: { [result.id]: 'rotate' },
+        explain: { tag: 'rotate', title: 'RR Rotation Complete',
+          body: `Left rotation complete. <code>${result.key}</code> is now the subtree root. The subtree is balanced.` }
+      };
+      return result;
+    }
+    if (bf < -1 && key < node.right.key) {
+      this._snap(`Imbalance at ${node.key} (BF=${bf}), Right-Left Rotation (RL case)`,
+        { [node.id]: 'rotate', [node.right.id]: 'rotate' },
+        { tag: 'rotate', title: 'RL Case — Right-Left Rotation',
+          body: `Backtracking to node <code>${node.key}</code>. Height updated to <code>${node.height}</code>. BF=${bf} — <strong>imbalanced!</strong> The new key <code>${key}</code> went into the left subtree of the right child. Fix: first right-rotate the right child <code>${node.right.key}</code>, then left-rotate <code>${node.key}</code>.` });
+      node.right = this._rightRotate(node.right);
+      const result = this._leftRotate(node);
+      this._pendingRotationSnap = {
+        desc: `Rotation done — ${result.key} is new subtree root (RL case)`,
+        hl: { [result.id]: 'rotate' },
+        explain: { tag: 'rotate', title: 'RL Rotation Complete',
+          body: `Right-left double rotation complete. <code>${result.key}</code> is now the subtree root. The subtree is balanced.` }
+      };
+      return result;
+    }
+    return node;
+  }
+
+  delete(key) {
+    const target = this._findNode(this.root, key);
+    if (!target) {
+      this._snap(`Key ${key} not found`, {},
+        { tag: 'info', title: 'Not Found', body: `Key <code>${key}</code> does not exist in the tree.` });
+      return false;
+    }
+    // Step-by-step traversal to target
+    {
+      let cur = this.root;
+      const visited = [];
+      while (cur) {
+        visited.push({ id: cur.id, key: cur.key });
+        const hl = {};
+        for (const v of visited) hl[v.id] = 'traverse';
+        if (key === cur.key) {
+          hl[cur.id] = 'delete';
+          this._snap(`Found ${key}`, hl,
+            { tag: 'delete', title: `Delete ${key}`,
+              body: `Found node <code>${key}</code>. ` +
+                (!target.left && !target.right ? 'It is a leaf node — simply remove it.' :
+                 !target.left || !target.right ? 'It has one child — replace it with that child.' :
+                 'It has two children — find its in-order successor (smallest node in right subtree) to replace it.') });
+          break;
+        }
+        const dir = key < cur.key ? 'left' : 'right';
+        this._snap(`Compare ${key} with ${cur.key}, go ${dir}`, hl,
+          { tag: 'delete', title: `Delete ${key}`,
+            body: `Searching for <code>${key}</code>. At node <code>${cur.key}</code>, since <code>${key} ${key < cur.key ? '&lt;' : '&gt;'} ${cur.key}</code>, go ${dir}.` });
+        cur = dir === 'left' ? cur.left : cur.right;
+      }
+    }
+
+    if (target.left && target.right) {
+      const suc = this._minNode(target.right);
+      this._snap(`In-order successor: ${suc.key}`, { [target.id]: 'delete', [suc.id]: 'successor' },
+        { tag: 'delete', title: 'Finding In-Order Successor',
+          body: `The in-order successor of <code>${key}</code> is <code>${suc.key}</code> (leftmost node in the right subtree). Copy <code>${suc.key}</code> into this node's position, then recursively delete <code>${suc.key}</code> from the right subtree.` });
+    }
+    this.root = this._deleteR(this.root, key);
+    // Fire pending rotation snap for root-level rotations
+    if (this._pendingRotationSnap) {
+      const prs = this._pendingRotationSnap;
+      this._pendingRotationSnap = null;
+      this._snap(prs.desc, prs.hl, prs.explain);
+    }
+    this._snap(`Delete ${key} complete`, {},
+      { tag: 'delete', title: `Deleted ${key} — Complete`,
+        body: `Node removed. All ancestor heights and balance factors have been updated. The tree is balanced.` });
+    return true;
+  }
+
+  _deleteR(root, key) {
+    if (!root) return null;
+    if (key < root.key) root.left = this._deleteR(root.left, key);
+    else if (key > root.key) root.right = this._deleteR(root.right, key);
+    else {
+      if (!root.left || !root.right) return root.left || root.right;
+      const temp = this._minNode(root.right);
+      root.key = temp.key;
+      root.right = this._deleteR(root.right, temp.key);
+    }
+
+    // Fire pending rotation snap (child rotation is now linked into the tree)
+    if (this._pendingRotationSnap) {
+      const prs = this._pendingRotationSnap;
+      this._pendingRotationSnap = null;
+      this._snap(prs.desc, prs.hl, prs.explain);
+    }
+
+    this._updH(root);
+    const bf = this._bf(root);
+
+    // Backtracking snapshot: show height/BF update at this ancestor
+    if (bf >= -1 && bf <= 1) {
+      this._snap(`Backtrack to ${root.key}: h=${root.height}, BF=${bf} — balanced`, { [root.id]: 'traverse' },
+        { tag: 'delete', title: 'Backtracking — Update Heights',
+          body: `Backtracking to node <code>${root.key}</code>. Updated height to <code>${root.height}</code>. Balance factor is <code>${bf}</code>, which is within [-1, 1] — no rotation needed. Continue backtracking.` });
+    }
+
+    if (bf > 1) {
+      if (this._bf(root.left) >= 0) {
+        this._snap(`Rebalance at ${root.key} (BF=${bf}), Right Rotation`,
+          { [root.id]: 'rotate', [root.left.id]: 'rotate' },
+          { tag: 'rotate', title: 'Rebalance — Right Rotation',
+            body: `Backtracking to node <code>${root.key}</code>. Height updated to <code>${root.height}</code>. BF=${bf} — <strong>imbalanced!</strong> Its left child has BF>=${0}, so a single right rotation restores balance.` });
+        const result = this._rightRotate(root);
+        this._pendingRotationSnap = {
+          desc: `Rotation done — ${result.key} is new subtree root`,
+          hl: { [result.id]: 'rotate' },
+          explain: { tag: 'rotate', title: 'Right Rotation Complete',
+            body: `Right rotation complete. <code>${result.key}</code> is now the subtree root. The subtree is balanced.` }
+        };
+        return result;
+      } else {
+        this._snap(`Rebalance at ${root.key} (BF=${bf}), Left-Right Rotation`,
+          { [root.id]: 'rotate', [root.left.id]: 'rotate' },
+          { tag: 'rotate', title: 'Rebalance — Left-Right Rotation',
+            body: `Backtracking to node <code>${root.key}</code>. Height updated to <code>${root.height}</code>. BF=${bf} — <strong>imbalanced!</strong> Its left child is right-heavy, so first left-rotate the left child, then right-rotate this node.` });
+        root.left = this._leftRotate(root.left);
+        const result = this._rightRotate(root);
+        this._pendingRotationSnap = {
+          desc: `Rotation done — ${result.key} is new subtree root`,
+          hl: { [result.id]: 'rotate' },
+          explain: { tag: 'rotate', title: 'Left-Right Rotation Complete',
+            body: `Left-right double rotation complete. <code>${result.key}</code> is now the subtree root. The subtree is balanced.` }
+        };
+        return result;
+      }
+    }
+    if (bf < -1) {
+      if (this._bf(root.right) <= 0) {
+        this._snap(`Rebalance at ${root.key} (BF=${bf}), Left Rotation`,
+          { [root.id]: 'rotate', [root.right.id]: 'rotate' },
+          { tag: 'rotate', title: 'Rebalance — Left Rotation',
+            body: `Backtracking to node <code>${root.key}</code>. Height updated to <code>${root.height}</code>. BF=${bf} — <strong>imbalanced!</strong> Its right child has BF<=${0}, so a single left rotation restores balance.` });
+        const result = this._leftRotate(root);
+        this._pendingRotationSnap = {
+          desc: `Rotation done — ${result.key} is new subtree root`,
+          hl: { [result.id]: 'rotate' },
+          explain: { tag: 'rotate', title: 'Left Rotation Complete',
+            body: `Left rotation complete. <code>${result.key}</code> is now the subtree root. The subtree is balanced.` }
+        };
+        return result;
+      } else {
+        this._snap(`Rebalance at ${root.key} (BF=${bf}), Right-Left Rotation`,
+          { [root.id]: 'rotate', [root.right.id]: 'rotate' },
+          { tag: 'rotate', title: 'Rebalance — Right-Left Rotation',
+            body: `Backtracking to node <code>${root.key}</code>. Height updated to <code>${root.height}</code>. BF=${bf} — <strong>imbalanced!</strong> Its right child is left-heavy, so first right-rotate the right child, then left-rotate this node.` });
+        root.right = this._rightRotate(root.right);
+        const result = this._leftRotate(root);
+        this._pendingRotationSnap = {
+          desc: `Rotation done — ${result.key} is new subtree root`,
+          hl: { [result.id]: 'rotate' },
+          explain: { tag: 'rotate', title: 'Right-Left Rotation Complete',
+            body: `Right-left double rotation complete. <code>${result.key}</code> is now the subtree root. The subtree is balanced.` }
+        };
+        return result;
+      }
+    }
+    return root;
+  }
+}
+
+// ── Tree Layout ──
+const TreeLayout = {
+  NODE_R: 24,
+  H_GAP: 68,
+  V_GAP: 78,
+  TOP_PAD: 50,
+
+  compute(root, svgW) {
+    const pos = new Map();
+    if (!root) return pos;
+    const topPad = svgW <= 640 ? 120 : this.TOP_PAD;
+    let idx = 0;
+    const walk = (node, depth) => {
+      if (!node) return;
+      walk(node.left, depth + 1);
+      pos.set(node.id, { x: idx * this.H_GAP, y: topPad + depth * this.V_GAP });
+      idx++;
+      walk(node.right, depth + 1);
+    };
+    walk(root, 0);
+    let minX = Infinity, maxX = -Infinity;
+    for (const p of pos.values()) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); }
+    const pad = this.NODE_R + 8;
+    const treeW = maxX - minX;
+    const usable = Math.max(svgW - pad * 2, 0);
+    // Scale down horizontally if tree is wider than available space
+    if (treeW > usable && treeW > 0) {
+      const scale = usable / treeW;
+      for (const p of pos.values()) p.x = minX + (p.x - minX) * scale;
+      minX = Infinity; maxX = -Infinity;
+      for (const p of pos.values()) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); }
+    }
+    const finalW = maxX - minX;
+    const off = pad + (usable - finalW) / 2 - minX;
+    for (const p of pos.values()) p.x += off;
+    return pos;
+  }
+};
+
+// ── Easing ──
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+// ── Explanation Overlay ──
+function showExplanation(explain) {
+  const el = document.getElementById('explanation');
+  if (!explain) { el.classList.remove('show'); return; }
+  const tagClass = { insert: 'tag-insert', delete: 'tag-delete', rotate: 'tag-rotate', info: 'tag-info' };
+  document.getElementById('expl-title').innerHTML =
+    `<span class="tag ${tagClass[explain.tag] || 'tag-info'}">${explain.tag}</span> ${explain.title}`;
+  document.getElementById('expl-body').innerHTML = explain.body;
+  el.classList.add('show');
+}
+
+// ── SVG Renderer ──
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const ANIM_DUR = 550;
+
+class SVGRenderer {
+  constructor() {
+    this.svg = document.getElementById('tree-svg');
+    this.canvasG = document.getElementById('canvas-group');
+    this.edgesG = document.getElementById('edges-group');
+    this.nodesG = document.getElementById('nodes-group');
+    this.previewG = document.getElementById('preview-group');
+    this.nodeEls = new Map();
+    this.curPos = new Map();       // last committed positions
+    this._livePos = new Map();     // current mid-animation positions
+    this._animId = 0;
+    this._previewEl = null;
+    this._lastNodeSig = '';        // signature of node IDs+keys to detect structure changes
+    this.panX = 0; this.panY = 0; this.zoom = 1;
+    this._setupPanZoom();
+  }
+
+  _setupPanZoom() {
+    let dragging = false, startX, startY, startPanX, startPanY;
+    this.svg.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      dragging = true; startX = e.clientX; startY = e.clientY;
+      startPanX = this.panX; startPanY = this.panY;
+      this.svg.classList.add('panning');
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      this.panX = startPanX + (e.clientX - startX);
+      this.panY = startPanY + (e.clientY - startY);
+      this._updateCanvasTransform();
+    });
+    window.addEventListener('mouseup', () => {
+      dragging = false; this.svg.classList.remove('panning');
+    });
+    this.svg.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const rect = this.svg.getBoundingClientRect();
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      const newZoom = Math.min(Math.max(this.zoom * factor, 0.2), 4);
+      const r = newZoom / this.zoom;
+      this.panX = mx - (mx - this.panX) * r;
+      this.panY = my - (my - this.panY) * r;
+      this.zoom = newZoom;
+      this._updateCanvasTransform();
+    }, { passive: false });
+    document.getElementById('zoom-in').onclick = () => this._zoomBy(1.25);
+    document.getElementById('zoom-out').onclick = () => this._zoomBy(1 / 1.25);
+    document.getElementById('zoom-reset').onclick = () => this.resetView();
+
+    // Touch support: drag to pan, pinch to zoom
+    let touchStartPanX, touchStartPanY, touchStartDist, touchStartZoom;
+    let singleTouch = false;
+    let lastMidX, lastMidY;
+
+    this.svg.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        singleTouch = true;
+        const t = e.touches[0];
+        startX = t.clientX; startY = t.clientY;
+        touchStartPanX = this.panX; touchStartPanY = this.panY;
+      } else if (e.touches.length === 2) {
+        singleTouch = false;
+        e.preventDefault();
+        const t0 = e.touches[0], t1 = e.touches[1];
+        touchStartDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+        touchStartZoom = this.zoom;
+        lastMidX = (t0.clientX + t1.clientX) / 2;
+        lastMidY = (t0.clientY + t1.clientY) / 2;
+      }
+    }, { passive: false });
+
+    this.svg.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1 && singleTouch) {
+        e.preventDefault();
+        const t = e.touches[0];
+        this.panX = touchStartPanX + (t.clientX - startX);
+        this.panY = touchStartPanY + (t.clientY - startY);
+        this._updateCanvasTransform();
+      } else if (e.touches.length === 2) {
+        e.preventDefault();
+        const t0 = e.touches[0], t1 = e.touches[1];
+        const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+        const midX = (t0.clientX + t1.clientX) / 2;
+        const midY = (t0.clientY + t1.clientY) / 2;
+        const rect = this.svg.getBoundingClientRect();
+        const mx = midX - rect.left, my = midY - rect.top;
+        // Pinch zoom around midpoint
+        const newZoom = Math.min(Math.max(touchStartZoom * (dist / touchStartDist), 0.2), 4);
+        const r = newZoom / this.zoom;
+        this.panX = mx - (mx - this.panX) * r;
+        this.panY = my - (my - this.panY) * r;
+        this.zoom = newZoom;
+        // Pan with midpoint movement
+        this.panX += midX - lastMidX;
+        this.panY += midY - lastMidY;
+        lastMidX = midX; lastMidY = midY;
+        this._updateCanvasTransform();
+      }
+    }, { passive: false });
+
+    this.svg.addEventListener('touchend', () => { singleTouch = false; });
+  }
+
+  _zoomBy(factor) {
+    const rect = this.svg.getBoundingClientRect();
+    const cx = rect.width / 2, cy = rect.height / 2;
+    const newZoom = Math.min(Math.max(this.zoom * factor, 0.2), 4);
+    const r = newZoom / this.zoom;
+    this.panX = cx - (cx - this.panX) * r;
+    this.panY = cy - (cy - this.panY) * r;
+    this.zoom = newZoom;
+    this._updateCanvasTransform();
+  }
+
+  _updateCanvasTransform() {
+    this.canvasG.setAttribute('transform', `translate(${this.panX},${this.panY}) scale(${this.zoom})`);
+  }
+
+  resetView() {
+    this.panX = 0; this.panY = 0; this.zoom = 1;
+    this._updateCanvasTransform();
+  }
+
+  // Build a signature string from the tree's node IDs and keys (in-order)
+  _treeSig(nodes) {
+    return nodes.map(n => n.id + ':' + n.key).join(',');
+  }
+
+  render(tree, highlights, animate) {
+    const rect = this.svg.getBoundingClientRect();
+    const targetPos = TreeLayout.compute(tree, rect.width);
+    const nodes = [], edges = [];
+    this._collect(tree, null, nodes, edges, highlights);
+
+    document.getElementById('empty-msg').style.display = tree ? 'none' : 'block';
+    const newIds = new Set(nodes.map(n => n.id));
+    const newSig = this._treeSig(nodes);
+    const structureChanged = newSig !== this._lastNodeSig;
+    this._lastNodeSig = newSig;
+
+    // Remove deleted nodes
+    for (const [id, els] of this.nodeEls) {
+      if (!newIds.has(id)) {
+        this._fadeOut(els.g);
+        this.nodeEls.delete(id);
+        this.curPos.delete(id);
+        this._livePos.delete(id);
+      }
+    }
+
+    // If only highlights changed (same structure), just update highlights/text in place
+    if (!structureChanged && !animate) {
+      for (const n of nodes) {
+        const els = this.nodeEls.get(n.id);
+        if (els) {
+          els.keyText.textContent = n.key;
+          els.bfText.textContent = n.bf;
+          els.htText.textContent = 'h=' + n.height;
+          this._hl(els, n.hlType);
+        }
+      }
+      return;
+    }
+
+    if (!structureChanged) {
+      // Structure didn't change but animate=true (e.g. highlight-only step in demo)
+      // Just update highlights, no position animation needed
+      for (const n of nodes) {
+        const els = this.nodeEls.get(n.id);
+        if (els) {
+          els.keyText.textContent = n.key;
+          els.bfText.textContent = n.bf;
+          els.htText.textContent = 'h=' + n.height;
+          this._hl(els, n.hlType);
+        }
+      }
+      // Still redraw edges at current live positions (in case a prior animation is ongoing)
+      this._drawEdges(edges, this._livePos.size ? this._livePos : this.curPos);
+      return;
+    }
+
+    // Structure changed — update or create nodes
+    for (const n of nodes) {
+      const tp = targetPos.get(n.id);
+      if (!tp) continue;
+      if (this.nodeEls.has(n.id)) {
+        const els = this.nodeEls.get(n.id);
+        els.keyText.textContent = n.key;
+        els.bfText.textContent = n.bf;
+        els.htText.textContent = 'h=' + n.height;
+        this._hl(els, n.hlType);
+      } else {
+        const els = this._makeNode(n);
+        this.nodesG.appendChild(els.g);
+        this.nodeEls.set(n.id, els);
+        // New node: start from its target position (no center-spawn)
+        this.curPos.set(n.id, { x: tp.x, y: tp.y });
+        this._livePos.set(n.id, { x: tp.x, y: tp.y });
+        if (animate) {
+          this._applyTransform(els.g, tp.x, tp.y);
+          els.circle.setAttribute('r', 0);
+          els.g.setAttribute('opacity', '0');
+          const popStart = performance.now();
+          const popTick = (now) => {
+            const pt = Math.min((now - popStart) / 400, 1);
+            const s = pt < 0.7 ? pt / 0.7 * 1.12 : 1.12 - (pt - 0.7) / 0.3 * 0.12;
+            els.circle.setAttribute('r', TreeLayout.NODE_R * (pt >= 1 ? 1 : Math.min(s, 1.12)));
+            els.g.setAttribute('opacity', String(Math.min(pt * 3, 1)));
+            if (pt < 1) requestAnimationFrame(popTick);
+            else { els.circle.setAttribute('r', TreeLayout.NODE_R); els.g.setAttribute('opacity', '1'); }
+          };
+          requestAnimationFrame(popTick);
+        } else {
+          this._applyTransform(els.g, tp.x, tp.y);
+        }
+      }
+    }
+
+    const isRotation = structureChanged && Object.values(highlights).some(v => v === 'rotate');
+
+    if (animate) {
+      this._animateToPositions(targetPos, edges, isRotation);
+    } else {
+      this._animId++; // cancel any in-flight animation
+      for (const n of nodes) {
+        const tp = targetPos.get(n.id);
+        const els = this.nodeEls.get(n.id);
+        if (tp && els) {
+          this.curPos.set(n.id, { x: tp.x, y: tp.y });
+          this._livePos.set(n.id, { x: tp.x, y: tp.y });
+          this._applyTransform(els.g, tp.x, tp.y);
+        }
+      }
+      this._drawEdges(edges, targetPos);
+    }
+  }
+
+  _animateToPositions(targetPos, edges, isRotation) {
+    // Use live positions (mid-animation) as starting point to avoid jitter
+    const startPos = new Map();
+    for (const [id, p] of this._livePos) startPos.set(id, { x: p.x, y: p.y });
+    // Fall back to curPos for nodes not yet in livePos
+    for (const [id, p] of this.curPos) { if (!startPos.has(id)) startPos.set(id, { x: p.x, y: p.y }); }
+    // For brand new nodes with no prior position, start at target
+    for (const [id, tp] of targetPos) { if (!startPos.has(id)) startPos.set(id, { x: tp.x, y: tp.y }); }
+
+    const dur = isRotation ? 1000 : ANIM_DUR;
+
+    // For rotation steps, compute arc offsets for nodes that move significantly
+    const arcNodes = new Map();
+    if (isRotation) {
+      for (const [id, tp] of targetPos) {
+        const sp = startPos.get(id) || tp;
+        const dy = tp.y - sp.y;
+        if (Math.abs(dy) > 10) {
+          // Nodes moving up swing right, nodes moving down swing left
+          arcNodes.set(id, dy > 0 ? -35 : 35);
+        }
+      }
+    }
+
+    const animToken = ++this._animId;
+    const t0 = performance.now();
+    const tick = (now) => {
+      if (animToken !== this._animId) return;
+      const rawT = Math.min((now - t0) / dur, 1);
+      const t = easeInOutCubic(rawT);
+      const interp = new Map();
+      for (const [id, tp] of targetPos) {
+        const sp = startPos.get(id) || tp;
+        let x = sp.x + (tp.x - sp.x) * t, y = sp.y + (tp.y - sp.y) * t;
+        const arc = arcNodes.get(id);
+        if (arc) x += arc * Math.sin(t * Math.PI);
+        interp.set(id, { x, y });
+        this._livePos.set(id, { x, y });
+        const els = this.nodeEls.get(id);
+        if (els) this._applyTransform(els.g, x, y);
+      }
+      this._drawEdges(edges, interp);
+      if (rawT < 1) { requestAnimationFrame(tick); }
+      else {
+        for (const [id, tp] of targetPos) {
+          this.curPos.set(id, { x: tp.x, y: tp.y });
+          this._livePos.set(id, { x: tp.x, y: tp.y });
+          const els = this.nodeEls.get(id);
+          if (els) this._applyTransform(els.g, tp.x, tp.y);
+        }
+        this._drawEdges(edges, targetPos);
+      }
+    };
+    requestAnimationFrame(tick);
+  }
+
+  _applyTransform(g, x, y) { g.setAttribute('transform', `translate(${x},${y})`); }
+
+  _fadeOut(g) {
+    let o = 1;
+    const tick = () => { o -= 0.06; if (o <= 0) { if (g.parentNode) g.remove(); return; } g.setAttribute('opacity', o); requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  }
+
+  _drawEdges(edges, positions) {
+    const R = TreeLayout.NODE_R;
+    while (this.edgesG.children.length > edges.length) this.edgesG.lastChild.remove();
+    while (this.edgesG.children.length < edges.length) {
+      const l = document.createElementNS(SVG_NS, 'line'); l.classList.add('edge-line'); this.edgesG.appendChild(l);
+    }
+    for (let i = 0; i < edges.length; i++) {
+      const { pid, cid } = edges[i];
+      const p1 = positions.get(pid), p2 = positions.get(cid), line = this.edgesG.children[i];
+      if (!p1 || !p2) { line.setAttribute('opacity', '0'); continue; }
+      const dx = p2.x - p1.x, dy = p2.y - p1.y, d = Math.sqrt(dx*dx+dy*dy)||1;
+      line.setAttribute('x1', p1.x+dx/d*R); line.setAttribute('y1', p1.y+dy/d*R);
+      line.setAttribute('x2', p2.x-dx/d*R); line.setAttribute('y2', p2.y-dy/d*R);
+      line.removeAttribute('opacity');
+    }
+  }
+
+  clear() {
+    this._animId++;
+    this.nodesG.innerHTML = ''; this.edgesG.innerHTML = '';
+    this.nodeEls.clear(); this.curPos.clear(); this._livePos.clear();
+    this._lastNodeSig = '';
+    this.clearPreview();
+    this.resetView();
+    document.getElementById('empty-msg').style.display = 'block';
+  }
+
+  showPreview(key) {
+    this.clearPreview();
+    const g = document.createElementNS(SVG_NS, 'g');
+    const circle = document.createElementNS(SVG_NS, 'circle');
+    circle.setAttribute('r', TreeLayout.NODE_R);
+    circle.classList.add('node-circle', 'hl-insert');
+    circle.setAttribute('filter', 'url(#glow)');
+    const keyText = document.createElementNS(SVG_NS, 'text');
+    keyText.classList.add('key-text');
+    keyText.textContent = key;
+    const label = document.createElementNS(SVG_NS, 'text');
+    label.setAttribute('y', -(TreeLayout.NODE_R + 10));
+    label.classList.add('preview-label');
+    label.textContent = 'new';
+    g.append(circle, keyText, label);
+    const rect = this.svg.getBoundingClientRect();
+    g.setAttribute('transform', `translate(${rect.width - 70}, 50)`);
+    this.previewG.appendChild(g);
+    this._previewEl = g;
+  }
+
+  clearPreview() {
+    if (this._previewEl) {
+      this._previewEl.remove();
+      this._previewEl = null;
+    }
+  }
+
+  _makeNode(n) {
+    const g = document.createElementNS(SVG_NS, 'g');
+    const circle = document.createElementNS(SVG_NS, 'circle');
+    circle.setAttribute('r', TreeLayout.NODE_R);
+    circle.classList.add('node-circle');
+    if (n.hlType) { circle.classList.add('hl-' + n.hlType); circle.setAttribute('filter', 'url(#glow)'); }
+    const keyText = document.createElementNS(SVG_NS, 'text');
+    keyText.classList.add('key-text');
+    keyText.textContent = n.key;
+    const bfText = document.createElementNS(SVG_NS, 'text');
+    bfText.classList.add('bf-text');
+    bfText.setAttribute('y', -(TreeLayout.NODE_R + 8));
+    bfText.textContent = n.bf;
+    const htText = document.createElementNS(SVG_NS, 'text');
+    htText.classList.add('ht-text');
+    htText.setAttribute('y', TreeLayout.NODE_R + 14);
+    htText.textContent = 'h=' + n.height;
+    g.append(circle, keyText, bfText, htText);
+    return { g, circle, keyText, bfText, htText };
+  }
+
+  _hl(els, type) {
+    els.circle.className.baseVal = 'node-circle' + (type ? ' hl-' + type : '');
+    els.circle.setAttribute('filter', type ? 'url(#glow)' : '');
+  }
+
+  _collect(node, parentId, nodes, edges, hl) {
+    if (!node) return;
+    const bf = (node.left ? node.left.height : 0) - (node.right ? node.right.height : 0);
+    nodes.push({ id: node.id, key: node.key, bf, height: node.height, hlType: hl[node.id] || null });
+    if (parentId !== null) edges.push({ pid: parentId, cid: node.id });
+    this._collect(node.left, node.id, nodes, edges, hl);
+    this._collect(node.right, node.id, nodes, edges, hl);
+  }
+}
+
+// ── Toast ──
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('status-toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ── Pseudocode Definitions ──
+const INSERT_CODE = [
+  { text: 'Node* insert(Node* node, int key) {', kw: ['Node', 'int'], fn: ['insert'] },
+  { text: '  if (node == nullptr)', kw: ['if', 'nullptr'] },
+  { text: '    return new Node(key);', kw: ['return', 'new', 'Node'] },
+  { text: '  if (key < node->key)', kw: ['if'] },
+  { text: '    node->left = insert(node->left, key);', fn: ['insert'] },
+  { text: '  else if (key > node->key)', kw: ['else', 'if'] },
+  { text: '    node->right = insert(node->right, key);', fn: ['insert'] },
+  { text: '' },
+  { text: '  updateHeight(node);', fn: ['updateHeight'] },
+  { text: '  int bf = balanceFactor(node);', kw: ['int'], fn: ['balanceFactor'] },
+  { text: '' },
+  { text: '  if (bf > 1 && key < node->left->key)', kw: ['if'], cmt: '// LL' },
+  { text: '    return rightRotate(node);', kw: ['return'], fn: ['rightRotate'] },
+  { text: '  if (bf > 1 && key > node->left->key)', kw: ['if'], cmt: '// LR' },
+  { text: '    node->left = leftRotate(node->left);', fn: ['leftRotate'] },
+  { text: '    return rightRotate(node);', kw: ['return'], fn: ['rightRotate'] },
+  { text: '  if (bf < -1 && key > node->right->key)', kw: ['if'], cmt: '// RR' },
+  { text: '    return leftRotate(node);', kw: ['return'], fn: ['leftRotate'] },
+  { text: '  if (bf < -1 && key < node->right->key)', kw: ['if'], cmt: '// RL' },
+  { text: '    node->right = rightRotate(node->right);', fn: ['rightRotate'] },
+  { text: '    return leftRotate(node);', kw: ['return'], fn: ['leftRotate'] },
+  { text: '  return node;', kw: ['return'] },
+  { text: '}' },
+];
+
+const DELETE_CODE = [
+  { text: 'Node* deleteNode(Node* node, int key) {', kw: ['Node', 'int'], fn: ['deleteNode'] },
+  { text: '  if (node == nullptr)', kw: ['if', 'nullptr'] },
+  { text: '    return nullptr;', kw: ['return', 'nullptr'] },
+  { text: '  if (key < node->key)', kw: ['if'] },
+  { text: '    node->left = deleteNode(node->left, key);', fn: ['deleteNode'] },
+  { text: '  else if (key > node->key)', kw: ['else', 'if'] },
+  { text: '    node->right = deleteNode(node->right, key);', fn: ['deleteNode'] },
+  { text: '  else {', kw: ['else'] },
+  { text: '    if (!node->left || !node->right)', kw: ['if'] },
+  { text: '      return node->left ? node->left : node->right;', kw: ['return'] },
+  { text: '    Node* succ = minNode(node->right);', kw: ['Node'], fn: ['minNode'] },
+  { text: '    node->key = succ->key;' },
+  { text: '    node->right = deleteNode(node->right, succ->key);', fn: ['deleteNode'] },
+  { text: '  }' },
+  { text: '  updateHeight(node);', fn: ['updateHeight'] },
+  { text: '  int bf = balanceFactor(node);', kw: ['int'], fn: ['balanceFactor'] },
+  { text: '' },
+  { text: '  if (bf > 1 && balanceFactor(node->left) >= 0)', kw: ['if'], fn: ['balanceFactor'] },
+  { text: '    return rightRotate(node);', kw: ['return'], fn: ['rightRotate'] },
+  { text: '  if (bf > 1 && balanceFactor(node->left) < 0)', kw: ['if'], fn: ['balanceFactor'] },
+  { text: '    node->left = leftRotate(node->left);', fn: ['leftRotate'] },
+  { text: '    return rightRotate(node);', kw: ['return'], fn: ['rightRotate'] },
+  { text: '  if (bf < -1 && balanceFactor(node->right) <= 0)', kw: ['if'], fn: ['balanceFactor'] },
+  { text: '    return leftRotate(node);', kw: ['return'], fn: ['leftRotate'] },
+  { text: '  if (bf < -1 && balanceFactor(node->right) > 0)', kw: ['if'], fn: ['balanceFactor'] },
+  { text: '    node->right = rightRotate(node->right);', fn: ['rightRotate'] },
+  { text: '    return leftRotate(node);', kw: ['return'], fn: ['leftRotate'] },
+  { text: '  return node;', kw: ['return'] },
+  { text: '}' },
+];
+
+const ROTATE_RIGHT_CODE = [
+  { text: 'Node* rightRotate(Node* y) {', kw: ['Node'], fn: ['rightRotate'] },
+  { text: '' },
+  { text: '  Node* x = y->left;', kw: ['Node'], cmt: '// new root' },
+  { text: '  Node* T2 = x->right;', kw: ['Node'], cmt: '// save subtree' },
+  { text: '' },
+  { text: '  x->right = y;', cmt: '// pivot' },
+  { text: '  y->left = T2;', cmt: '// reattach' },
+  { text: '' },
+  { text: '  updateHeight(y);', fn: ['updateHeight'] },
+  { text: '  updateHeight(x);', fn: ['updateHeight'] },
+  { text: '' },
+  { text: '  return x;', kw: ['return'], cmt: '// new root' },
+  { text: '}' },
+];
+
+const ROTATE_LEFT_CODE = [
+  { text: 'Node* leftRotate(Node* x) {', kw: ['Node'], fn: ['leftRotate'] },
+  { text: '' },
+  { text: '  Node* y = x->right;', kw: ['Node'], cmt: '// new root' },
+  { text: '  Node* T2 = y->left;', kw: ['Node'], cmt: '// save subtree' },
+  { text: '' },
+  { text: '  y->left = x;', cmt: '// pivot' },
+  { text: '  x->right = T2;', cmt: '// reattach' },
+  { text: '' },
+  { text: '  updateHeight(x);', fn: ['updateHeight'] },
+  { text: '  updateHeight(y);', fn: ['updateHeight'] },
+  { text: '' },
+  { text: '  return y;', kw: ['return'], cmt: '// new root' },
+  { text: '}' },
+];
+
+const ROTATE_LR_CODE = [
+  { text: 'LR Double Rotation {', kw: [] },
+  { text: '' },
+  { text: '// Step 1: leftRotate(node->left)' },
+  { text: '  Node* y = node->left;', kw: ['Node'] },
+  { text: '  Node* z = y->right;', kw: ['Node'], cmt: '// new left child' },
+  { text: '  y->right = z->left;' },
+  { text: '  z->left = y;', cmt: '// pivot' },
+  { text: '  node->left = z;' },
+  { text: '' },
+  { text: '// Step 2: rightRotate(node)' },
+  { text: '  Node* x = node->left;', kw: ['Node'], cmt: '// = z from step 1' },
+  { text: '  node->left = x->right;' },
+  { text: '  x->right = node;', cmt: '// pivot' },
+  { text: '' },
+  { text: '  updateHeight(...);', fn: ['updateHeight'] },
+  { text: '  return x;', kw: ['return'], cmt: '// new root' },
+  { text: '}' },
+];
+
+const ROTATE_RL_CODE = [
+  { text: 'RL Double Rotation {', kw: [] },
+  { text: '' },
+  { text: '// Step 1: rightRotate(node->right)' },
+  { text: '  Node* y = node->right;', kw: ['Node'] },
+  { text: '  Node* z = y->left;', kw: ['Node'], cmt: '// new right child' },
+  { text: '  y->left = z->right;' },
+  { text: '  z->right = y;', cmt: '// pivot' },
+  { text: '  node->right = z;' },
+  { text: '' },
+  { text: '// Step 2: leftRotate(node)' },
+  { text: '  Node* x = node->right;', kw: ['Node'], cmt: '// = z from step 1' },
+  { text: '  node->right = x->left;' },
+  { text: '  x->left = node;', cmt: '// pivot' },
+  { text: '' },
+  { text: '  updateHeight(...);', fn: ['updateHeight'] },
+  { text: '  return x;', kw: ['return'], cmt: '// new root' },
+  { text: '}' },
+];
+
+const CODE_BLOCKS = {
+  'insert': INSERT_CODE,
+  'delete': DELETE_CODE,
+  'rotate-right': ROTATE_RIGHT_CODE,
+  'rotate-left': ROTATE_LEFT_CODE,
+  'rotate-lr': ROTATE_LR_CODE,
+  'rotate-rl': ROTATE_RL_CODE,
+};
+
+const BADGE_LABELS = {
+  'insert': 'Insert',
+  'delete': 'Delete',
+  'rotate-right': 'Right Rotate',
+  'rotate-left': 'Left Rotate',
+  'rotate-lr': 'LR Double Rotate',
+  'rotate-rl': 'RL Double Rotate',
+};
+function getCodeHighlight(op, desc, explain) {
+  if (!op) return null;
+
+  // Rotation code blocks — check these first (works for both insert and delete)
+  // Insert descs: "...Right Rotation (LL case)", delete descs: "Rebalance at..., Right Rotation"
+  if (desc.includes('LL case') && !desc.startsWith('Rotation done'))
+    return { codeBlock: 'rotate-right', lines: [2, 3, 5, 6], hlType: 'hl-rotate' };
+  if (desc.includes('LR case') && !desc.startsWith('Rotation done'))
+    return { codeBlock: 'rotate-lr', lines: [3, 4, 5, 6, 7], hlType: 'hl-rotate' };
+  if (desc.includes('RR case') && !desc.startsWith('Rotation done'))
+    return { codeBlock: 'rotate-left', lines: [2, 3, 5, 6], hlType: 'hl-rotate' };
+  if (desc.includes('RL case') && !desc.startsWith('Rotation done'))
+    return { codeBlock: 'rotate-rl', lines: [3, 4, 5, 6, 7], hlType: 'hl-rotate' };
+
+  // Delete rotation descs (no case name): "Rebalance at..., Left-Right Rotation", etc.
+  if (desc.includes('Left-Right Rotation'))
+    return { codeBlock: 'rotate-lr', lines: [3, 4, 5, 6, 7], hlType: 'hl-rotate' };
+  if (desc.includes('Right-Left Rotation'))
+    return { codeBlock: 'rotate-rl', lines: [3, 4, 5, 6, 7], hlType: 'hl-rotate' };
+  if (desc.includes('Right Rotation') && !desc.startsWith('Rotation done'))
+    return { codeBlock: 'rotate-right', lines: [2, 3, 5, 6], hlType: 'hl-rotate' };
+  if (desc.includes('Left Rotation') && !desc.startsWith('Rotation done'))
+    return { codeBlock: 'rotate-left', lines: [2, 3, 5, 6], hlType: 'hl-rotate' };
+
+  // Post-rotation snapshots — show heights updated + return
+  if (desc.startsWith('Rotation done')) {
+    // Insert descs include case name: "Rotation done — 13... (LL case)"
+    if (desc.includes('LL')) return { codeBlock: 'rotate-right', lines: [8, 9, 11], hlType: 'hl-rotate' };
+    if (desc.includes('LR')) return { codeBlock: 'rotate-lr', lines: [10, 11, 12, 14, 15], hlType: 'hl-rotate' };
+    if (desc.includes('RR')) return { codeBlock: 'rotate-left', lines: [8, 9, 11], hlType: 'hl-rotate' };
+    if (desc.includes('RL')) return { codeBlock: 'rotate-rl', lines: [10, 11, 12, 14, 15], hlType: 'hl-rotate' };
+    // Delete descs have no case name — use explain.title
+    if (explain && explain.title) {
+      if (explain.title.includes('Left-Right')) return { codeBlock: 'rotate-lr', lines: [10, 11, 12, 14, 15], hlType: 'hl-rotate' };
+      if (explain.title.includes('Right-Left')) return { codeBlock: 'rotate-rl', lines: [10, 11, 12, 14, 15], hlType: 'hl-rotate' };
+      if (explain.title.includes('Right')) return { codeBlock: 'rotate-right', lines: [8, 9, 11], hlType: 'hl-rotate' };
+      if (explain.title.includes('Left')) return { codeBlock: 'rotate-left', lines: [8, 9, 11], hlType: 'hl-rotate' };
+    }
+    return { codeBlock: 'rotate-right', lines: [11], hlType: 'hl-rotate' };
+  }
+
+  // Non-rotation insert steps
+  if (op === 'insert') {
+    if (desc.startsWith('New node')) return { codeBlock: 'insert', lines: [0], hlType: 'hl' };
+    if (desc.includes(', go left')) return { codeBlock: 'insert', lines: [3, 4], hlType: 'hl' };
+    if (desc.includes(', go right')) return { codeBlock: 'insert', lines: [5, 6], hlType: 'hl' };
+    if (desc.startsWith('Created leaf')) return { codeBlock: 'insert', lines: [1, 2], hlType: 'hl-insert' };
+    if (desc.includes('Backtrack') && desc.includes('balanced')) return { codeBlock: 'insert', lines: [8, 9], hlType: 'hl' };
+    if (desc.includes('complete')) return { codeBlock: 'insert', lines: [21], hlType: 'hl-insert' };
+    return { codeBlock: 'insert', lines: [], hlType: 'hl' };
+  }
+
+  // Non-rotation delete steps
+  if (op === 'delete') {
+    if (desc.includes(', go left')) return { codeBlock: 'delete', lines: [3, 4], hlType: 'hl' };
+    if (desc.includes(', go right')) return { codeBlock: 'delete', lines: [5, 6], hlType: 'hl' };
+    if (desc.startsWith('Found')) {
+      if (explain && explain.body && (explain.body.includes('leaf') || explain.body.includes('one child')))
+        return { codeBlock: 'delete', lines: [7, 8, 9], hlType: 'hl-delete' };
+      return { codeBlock: 'delete', lines: [7], hlType: 'hl-delete' };
+    }
+    if (desc.includes('successor')) return { codeBlock: 'delete', lines: [10, 11, 12], hlType: 'hl' };
+    if (desc.includes('Backtrack') && desc.includes('balanced')) return { codeBlock: 'delete', lines: [14, 15], hlType: 'hl' };
+    if (desc.includes('complete')) return { codeBlock: 'delete', lines: [27], hlType: 'hl-delete' };
+    return { codeBlock: 'delete', lines: [], hlType: 'hl' };
+  }
+
+  return null;
+}
+
+// ── Code Panel ──
+class CodePanel {
+  constructor() {
+    this.el = document.getElementById('code-content');
+    this.badge = document.getElementById('code-op-badge');
+    this.currentBlock = null;
+    this._lineEls = [];
+  }
+
+  update(op, desc, explain) {
+    const result = getCodeHighlight(op, desc, explain);
+    if (!result) {
+      this._clearHighlights();
+      return;
+    }
+    if (result.codeBlock !== this.currentBlock) {
+      this.currentBlock = result.codeBlock;
+      this._renderCode(CODE_BLOCKS[result.codeBlock]);
+      const badgeOp = result.codeBlock.startsWith('rotate') ? 'rotate' : result.codeBlock;
+      this.badge.className = 'code-op-badge op-' + badgeOp;
+      this.badge.textContent = BADGE_LABELS[result.codeBlock] || result.codeBlock;
+    }
+    this._highlightLines(result.lines, result.hlType);
+  }
+
+  _renderCode(codeLines) {
+    this.el.innerHTML = '';
+    this._lineEls = [];
+    for (let i = 0; i < codeLines.length; i++) {
+      const def = codeLines[i];
+      const div = document.createElement('div');
+      div.className = 'code-line' + (def.text === '' ? ' blank' : '');
+      const num = document.createElement('span');
+      num.className = 'line-num';
+      num.textContent = def.text.trim() ? String(i + 1) : '';
+      const text = document.createElement('span');
+      text.className = 'line-text';
+      text.innerHTML = this._colorize(def);
+      div.append(num, text);
+      this.el.appendChild(div);
+      this._lineEls.push(div);
+    }
+  }
+
+  _colorize(def) {
+    let t = def.text;
+    if (!t) return '';
+    // Escape HTML
+    t = t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Standalone comment line
+    if (t.trim().startsWith('//')) return '<span class="code-cmt">' + t + '</span>';
+    // Color comment first
+    if (def.cmt) {
+      const cmt = def.cmt.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      t += ' <span class="code-cmt">' + cmt + '</span>';
+    }
+    // Color keywords
+    if (def.kw) {
+      for (const kw of def.kw) {
+        t = t.replace(new RegExp('\\b(' + kw + ')\\b', 'g'), '<span class="code-kw">$1</span>');
+      }
+    }
+    // Color function names
+    if (def.fn) {
+      for (const fn of def.fn) {
+        t = t.replace(new RegExp('\\b(' + fn + ')\\b'), '<span class="code-fn">$1</span>');
+      }
+    }
+    return t;
+  }
+
+  _highlightLines(lineIndices, hlType) {
+    for (const el of this._lineEls) {
+      el.classList.remove('hl', 'hl-insert', 'hl-delete', 'hl-rotate');
+    }
+    for (const idx of lineIndices) {
+      if (this._lineEls[idx]) {
+        this._lineEls[idx].classList.add(hlType || 'hl');
+      }
+    }
+    if (lineIndices.length > 0 && this._lineEls[lineIndices[0]]) {
+      this._lineEls[lineIndices[0]].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
+
+  _clearHighlights() {
+    for (const el of this._lineEls) {
+      el.classList.remove('hl', 'hl-insert', 'hl-delete', 'hl-rotate');
+    }
+  }
+
+  clear() {
+    this.currentBlock = null;
+    this._lineEls = [];
+    this.el.innerHTML = '<div class="code-placeholder">Step through an operation to see the algorithm</div>';
+    this.badge.className = 'code-op-badge';
+    this.badge.textContent = '';
+  }
+}
+
+// ── Demo Controller ──
+class DemoController {
+  constructor(renderer) {
+    this.renderer = renderer;
+    this.snapshots = [];
+    this.idx = 0;
+    this.playing = false;
+    this.playTimer = null;
+    this._generate();
+  }
+
+  _generate() {
+    const snaps = [];
+    snaps.push({ tree: null, desc: 'Empty tree', hl: {}, type: '', op: null,
+      explain: { tag: 'info', title: 'AVL Tree Demo', body: 'Step through the operations from <code>main()</code> in avl.cpp. We will insert 8 keys and delete one, observing how the tree maintains balance.' } });
+    let currentOp = null;
+    const tree = new AVLTree((root, desc, hl, explain, preview) => {
+      const type = desc.includes('Rotation') || desc.includes('Rebalance') ? 'rotate' : '';
+      snaps.push({ tree: root, desc, hl, type, explain, preview, op: currentOp });
+    });
+    for (const k of [33, 13, 53, 9, 21, 61, 8, 11]) { currentOp = 'insert'; tree.insert(k); }
+    currentOp = 'delete';
+    tree.delete(13);
+    this.snapshots = snaps;
+  }
+
+  show(animate) {
+    const s = this.snapshots[this.idx];
+    this.renderer.render(s.tree, s.hl, animate !== false);
+    if (s.preview) this.renderer.showPreview(s.preview.key);
+    else this.renderer.clearPreview();
+    showExplanation(s.explain);
+    if (codePanel) codePanel.update(s.op, s.desc, s.explain);
+    document.getElementById('step-counter').textContent = `Step ${this.idx} / ${this.snapshots.length - 1}`;
+    document.getElementById('step-counter').style.display = '';
+    this._updateLog();
+    this._updateButtons();
+  }
+
+  next() { if (this.idx < this.snapshots.length - 1) { this.idx++; this.show(); } }
+  prev() { if (this.idx > 0) { this.idx--; this.show(); } }
+  reset() { this.stop(); this.idx = 0; this.renderer.clear(); this.show(false); }
+
+  play() {
+    if (this.playing) return this.stop();
+    this.playing = true;
+    this._updateButtons();
+    const tick = () => {
+      if (this.idx < this.snapshots.length - 1) { this.idx++; this.show(); this.playTimer = setTimeout(tick, this._speed()); }
+      else this.stop();
+    };
+    this.playTimer = setTimeout(tick, this._speed());
+  }
+
+  stop() { this.playing = false; clearTimeout(this.playTimer); this._updateButtons(); }
+
+  _speed() { const v = document.getElementById('speed-slider'); return v ? (2400 - parseInt(v.value) * 400) : 1200; }
+
+  _updateLog() {
+    const el = document.getElementById('log-entries');
+    el.innerHTML = '';
+    for (let i = 0; i <= this.idx; i++) {
+      const s = this.snapshots[i];
+      const d = document.createElement('div');
+      d.className = 'log-entry' + (i === this.idx ? ' active' : '') +
+        (s.type ? ' type-' + s.type : (s.desc.includes('Insert') ? ' type-insert' : (s.desc.includes('Delet') ? ' type-delete' : '')));
+      d.innerHTML = `<span class="step-num">${i}</span>${s.desc}`;
+      el.appendChild(d);
+    }
+    el.scrollTop = el.scrollHeight;
+  }
+
+  _updateButtons() {
+    const prev = document.getElementById('d-prev');
+    const next = document.getElementById('d-next');
+    const play = document.getElementById('d-play');
+    if (prev) prev.disabled = this.idx <= 0;
+    if (next) next.disabled = this.idx >= this.snapshots.length - 1;
+    if (play) play.textContent = this.playing ? 'Pause' : 'Play All';
+  }
+}
+
+// ── Interactive Controller ──
+class InteractiveController {
+  constructor(renderer) {
+    this.renderer = renderer;
+    this.tree = null;
+    this._animating = false;
+    this._reset();
+  }
+
+  _reset() {
+    AVLNode._nextId = 10000;
+    this.tree = new AVLTree(null);
+    this._animating = false;
+    this.renderer.clear();
+    document.getElementById('step-counter').style.display = 'none';
+    document.getElementById('log-entries').innerHTML = '';
+    showExplanation(null);
+    if (codePanel) codePanel.clear();
+  }
+
+  _setControlsEnabled(enabled) {
+    const ids = ['i-insert', 'i-delete', 'i-clear'];
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el) el.disabled = !enabled;
+    }
+  }
+
+  _speed() { const v = document.getElementById('i-speed-slider'); return v ? (2400 - parseInt(v.value) * 400) : 700; }
+
+  _playSteps(steps, onDone) {
+    if (!steps.length) { if (onDone) onDone(); return; }
+    this._animating = true;
+    this._setControlsEnabled(false);
+    let i = 0;
+    const speed = this._speed();
+    const tick = () => {
+      const s = steps[i];
+      this.renderer.render(s.tree, s.hl, true);
+      if (s.preview) this.renderer.showPreview(s.preview.key);
+      else this.renderer.clearPreview();
+      showExplanation(s.explain);
+      if (codePanel) codePanel.update(s.op, s.desc, s.explain);
+      // Add to log for rotations and key events
+      if (s.desc.includes('Rotation') || s.desc.includes('Rebalance')) {
+        this._addLog(s.desc, 'rotate');
+      }
+      i++;
+      if (i < steps.length) {
+        setTimeout(tick, speed);
+      } else {
+        this._animating = false;
+        this._setControlsEnabled(true);
+        if (onDone) onDone();
+      }
+    };
+    tick();
+  }
+
+  insert(key) {
+    if (isNaN(key)) { showToast('Enter a valid number'); return; }
+    if (this._animating) return;
+    const steps = [];
+    this.tree._onSnapshot = (root, desc, hl, explain, preview) => { steps.push({ tree: root, desc, hl, explain, preview, op: 'insert' }); };
+    const ok = this.tree.insert(key);
+    this.tree._onSnapshot = null;
+    if (!ok) { showToast(`${key} already exists`); return; }
+    this._addLog(`Insert ${key}`, 'insert');
+    this._playSteps(steps, () => {
+      // Clear highlights after a brief pause
+      setTimeout(() => {
+        this.renderer.render(this.tree.root ? this.tree.root.deepClone() : null, {}, true);
+        showExplanation(null);
+        if (codePanel) codePanel._clearHighlights();
+      }, 800);
+    });
+  }
+
+  delete(key) {
+    if (isNaN(key)) { showToast('Enter a valid number'); return; }
+    if (this._animating) return;
+    const steps = [];
+    this.tree._onSnapshot = (root, desc, hl, explain, preview) => { steps.push({ tree: root, desc, hl, explain, preview, op: 'delete' }); };
+    const ok = this.tree.delete(key);
+    this.tree._onSnapshot = null;
+    if (!ok) { showToast(`${key} not found in tree`); return; }
+    this._addLog(`Delete ${key}`, 'delete');
+    this._playSteps(steps, () => {
+      setTimeout(() => {
+        this.renderer.render(this.tree.root ? this.tree.root.deepClone() : null, {}, true);
+        showExplanation(null);
+        if (codePanel) codePanel._clearHighlights();
+      }, 800);
+    });
+  }
+
+  clear() {
+    if (this._animating) return;
+    this._reset();
+    this._addLog('Tree cleared', '');
+    showToast('Tree cleared');
+  }
+
+  _addLog(text, type) {
+    const el = document.getElementById('log-entries');
+    const prev = el.querySelector('.log-entry.active');
+    if (prev) prev.classList.remove('active');
+    const d = document.createElement('div');
+    d.className = `log-entry active${type ? ' type-' + type : ''}`;
+    d.innerHTML = `<span class="step-num">&bull;</span>${text}`;
+    el.appendChild(d);
+    el.scrollTop = el.scrollHeight;
+  }
+}
+
+// ── Log Toggle (mobile) ──
+document.getElementById('log-toggle').addEventListener('click', () => {
+  document.querySelector('.log-panel').classList.toggle('open');
+});
+document.getElementById('code-toggle').addEventListener('click', () => {
+  document.querySelector('.code-panel').classList.toggle('open');
+});
+
+// ── Code Panel Resize ──
+{
+  const handle = document.getElementById('code-resize-handle');
+  const panel = document.getElementById('code-panel');
+  let startX, startW;
+  handle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    startX = e.clientX;
+    startW = panel.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    const onMove = (e) => {
+      const w = Math.min(Math.max(startW + (e.clientX - startX), 150), 600);
+      panel.style.width = w + 'px';
+    };
+    const onUp = () => {
+      handle.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  });
+}
+
+// ── App ──
+const renderer = new SVGRenderer();
+const codePanel = new CodePanel();
+let demo = new DemoController(renderer);
+let interactive = new InteractiveController(renderer);
+let mode = 'demo';
+
+function renderDemoControls() {
+  document.getElementById('controls-bar').innerHTML = `
+    <button id="d-reset">Reset</button>
+    <button id="d-prev">Prev</button>
+    <button id="d-next" class="primary">Next</button>
+    <button id="d-play">Play All</button>
+    <div class="speed-group"><label>Speed</label><input type="range" id="speed-slider" min="1" max="5" value="3"></div>
+  `;
+  document.getElementById('d-reset').onclick = () => demo.reset();
+  document.getElementById('d-prev').onclick = () => demo.prev();
+  document.getElementById('d-next').onclick = () => demo.next();
+  document.getElementById('d-play').onclick = () => demo.play();
+}
+
+function renderInteractiveControls() {
+  document.getElementById('controls-bar').innerHTML = `
+    <input type="number" id="i-key" placeholder="Key...">
+    <button id="i-insert" class="primary">Insert</button>
+    <button id="i-delete" class="danger">Delete</button>
+    <button id="i-clear">Clear Tree</button>
+    <div class="speed-group"><label>Speed</label><input type="range" id="i-speed-slider" min="1" max="5" value="3"></div>
+  `;
+  const inp = document.getElementById('i-key');
+  document.getElementById('i-insert').onclick = () => { interactive.insert(parseInt(inp.value)); inp.value = ''; inp.focus(); };
+  document.getElementById('i-delete').onclick = () => { interactive.delete(parseInt(inp.value)); inp.value = ''; inp.focus(); };
+  document.getElementById('i-clear').onclick = () => interactive.clear();
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); interactive.insert(parseInt(inp.value)); inp.value = ''; } });
+}
+
+function switchMode(m) {
+  if (m === mode) return;
+  mode = m;
+  document.getElementById('btn-demo').classList.toggle('active', m === 'demo');
+  document.getElementById('btn-interactive').classList.toggle('active', m === 'interactive');
+  document.getElementById('log-entries').innerHTML = '';
+  renderer.clear(); showExplanation(null); codePanel.clear();
+  if (m === 'demo') { demo = new DemoController(renderer); renderDemoControls(); demo.show(false); }
+  else { interactive = new InteractiveController(renderer); renderInteractiveControls(); }
+}
+
+document.getElementById('btn-demo').onclick = () => switchMode('demo');
+document.getElementById('btn-interactive').onclick = () => switchMode('interactive');
+
+renderDemoControls();
+demo.show(false);
+</script>
+</body>
+</html>
